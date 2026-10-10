@@ -1,5 +1,6 @@
 import json
 import re
+import base64
 import logging
 from typing import List, Dict, Any, Optional
 from app.config import settings
@@ -22,9 +23,22 @@ class GeminiService:
     def __init__(self):
         self.default_model = settings.GEMINI_MODEL
 
+    def _get_openai_client(self, custom_key: Optional[str] = None):
+        key = (custom_key or "").strip()
+        if not key.startswith("sk-"):
+            key = (settings.OPENAI_API_KEY or "").strip()
+        if not key or not key.startswith("sk-"):
+            return None
+        try:
+            from openai import AsyncOpenAI
+            return AsyncOpenAI(api_key=key)
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            return None
+
     def _get_client(self, custom_key: Optional[str] = None):
         key = (custom_key or "").strip() or (settings.GEMINI_API_KEY or "").strip()
-        if not key:
+        if not key or key.startswith("sk-"):
             return None
         try:
             from google import genai
@@ -40,51 +54,85 @@ class GeminiService:
         language: str = "uz",
         custom_key: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        openai_client = self._get_openai_client(custom_key)
         client = self._get_client(custom_key)
-        if not client:
-            logger.info("No Gemini API key provided. Using educational mock detection.")
+        if not client and not openai_client:
+            logger.info("No Gemini or OpenAI API key provided. Using educational mock detection.")
             return get_fallback_detected_objects("bicycle", language)
 
         prompt = f"""
 You are an expert educational AI in "World as a Classroom".
 Analyze this image carefully. Identify 1 to 4 prominent real-world objects or key functional components that have high scientific and educational value for school students (e.g., Physics, Chemistry, Biology, Mathematics, Technology, History).
 
-Respond strictly with a JSON array adhering to this schema:
-[
-  {{
-    "name": "Object name translated into {language} (uz: Uzbek, en: English, ru: Russian)",
-    "name_en": "Standard English name",
-    "category": "Domain (e.g. Transport & Mechanics, Botany, Optics, Electronics)",
-    "educational_hook": "A 1-sentence captivating hook in {language} explaining why this object is exciting to explore",
-    "subjects": ["Physics", "Mathematics", "Biology", "Chemistry", "Technology", "History"],
-    "confidence": 0.95,
-    "bounding_box": {{"ymin": 0.1, "xmin": 0.1, "ymax": 0.9, "xmax": 0.9}}
-  }}
-]
+Respond strictly with a JSON object adhering to this schema:
+{{
+  "objects": [
+    {{
+      "name": "Object name translated into {language} (uz: Uzbek, en: English, ru: Russian)",
+      "name_en": "Standard English name",
+      "category": "Domain (e.g. Transport & Mechanics, Botany, Optics, Electronics)",
+      "educational_hook": "A 1-sentence captivating hook in {language} explaining why this object is exciting to explore",
+      "subjects": ["Physics", "Mathematics", "Biology", "Chemistry", "Technology", "History"],
+      "confidence": 0.95,
+      "bounding_box": {{"ymin": 0.1, "xmin": 0.1, "ymax": 0.9, "xmax": 0.9}}
+    }}
+  ]
+}}
 Language for name and educational_hook: {language}.
 Return only valid JSON.
 """
-        try:
-            from google.genai import types
-            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            
-            response = client.models.generate_content(
-                model=self.default_model,
-                contents=[part, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
+        # 1. Try OpenAI Vision if key available
+        if openai_client:
+            try:
+                base64_img = base64.b64encode(image_bytes).decode("utf-8")
+                data_uri = f"data:{mime_type};base64,{base64_img}"
+                response = await openai_client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": data_uri}}
+                            ]
+                        }
+                    ],
+                    response_format={"type": "json_object"},
                     temperature=0.2
                 )
-            )
-            raw = response.text or ""
-            cleaned = _clean_json_text(raw)
-            data = json.loads(cleaned)
-            if isinstance(data, list) and len(data) > 0:
-                return data
-            elif isinstance(data, dict) and "objects" in data:
-                return data["objects"]
-        except Exception as e:
-            logger.error(f"Gemini object detection failed: {e}. Falling back.")
+                raw = response.choices[0].message.content or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, dict) and "objects" in data and isinstance(data["objects"], list):
+                    return data["objects"]
+                elif isinstance(data, list) and len(data) > 0:
+                    return data
+            except Exception as e:
+                logger.error(f"OpenAI object detection failed: {e}. Trying Gemini if configured.")
+
+        # 2. Try Gemini Vision if key available
+        if client:
+            try:
+                from google.genai import types
+                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                
+                response = client.models.generate_content(
+                    model=self.default_model,
+                    contents=[part, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.2
+                    )
+                )
+                raw = response.text or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+                elif isinstance(data, dict) and "objects" in data:
+                    return data["objects"]
+            except Exception as e:
+                logger.error(f"Gemini object detection failed: {e}. Falling back.")
         
         return get_fallback_detected_objects("bicycle", language)
 
@@ -98,9 +146,10 @@ Return only valid JSON.
         knowledge_level: str = "intermediate",
         custom_key: Optional[str] = None
     ) -> Dict[str, Any]:
+        openai_client = self._get_openai_client(custom_key)
         client = self._get_client(custom_key)
-        if not client:
-            logger.info("No Gemini API key provided. Using educational mock lesson.")
+        if not client and not openai_client:
+            logger.info("No Gemini or OpenAI API key provided. Using educational mock lesson.")
             return get_fallback_lesson(object_name, language)
 
         target_lang_str = "Uzbek (O'zbek tili, Lotin yozuvi)" if language == "uz" else ("Russian (Русский язык)" if language == "ru" else "English")
@@ -276,23 +325,45 @@ Please generate an extensive, inspiring lesson strictly formatted as the followi
 
 Everything must be written in {target_lang_str}. Return ONLY the JSON object.
 """
-        try:
-            from google.genai import types
-            response = client.models.generate_content(
-                model=self.default_model,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
+        # 1. Try OpenAI if key available
+        if openai_client:
+            try:
+                response = await openai_client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are the master curriculum creator for World as a Classroom."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
                     temperature=0.4
                 )
-            )
-            raw = response.text or ""
-            cleaned = _clean_json_text(raw)
-            data = json.loads(cleaned)
-            if isinstance(data, dict) and "modules" in data:
-                return data
-        except Exception as e:
-            logger.error(f"Gemini lesson generation failed: {e}. Falling back.")
+                raw = response.choices[0].message.content or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, dict) and "modules" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"OpenAI lesson generation failed: {e}. Trying Gemini if configured.")
+
+        # 2. Try Gemini if key available
+        if client:
+            try:
+                from google.genai import types
+                response = client.models.generate_content(
+                    model=self.default_model,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.4
+                    )
+                )
+                raw = response.text or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, dict) and "modules" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"Gemini lesson generation failed: {e}. Falling back.")
 
         return get_fallback_lesson(object_name, language)
 
@@ -305,10 +376,11 @@ Everything must be written in {target_lang_str}. Return ONLY the JSON object.
         language: str = "uz",
         custom_key: Optional[str] = None
     ) -> Dict[str, Any]:
+        openai_client = self._get_openai_client(custom_key)
         client = self._get_client(custom_key)
         target_lang_str = "Uzbek" if language == "uz" else ("Russian" if language == "ru" else "English")
 
-        if not client:
+        if not client and not openai_client:
             # High quality fallback response
             if language == "uz":
                 reply = f"Ajoyib savol! '{object_name}' misolida bu hodisa fizika va muhandislikning eng qiziqarli qonuniyatlariga bog'liq. Har qanday murakkab texnik qurilma yoki tabiiy jarayon energiyaning bir turdan ikkinchi turga aylanishi tamoyiliga tayanadi. Sizni yana qaysi jihati qiziqtiradi?"
@@ -356,23 +428,45 @@ Return a JSON object strictly matching:
   ]
 }}
 """
-        try:
-            from google.genai import types
-            response = client.models.generate_content(
-                model=self.default_model,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
+        # 1. Try OpenAI if key available
+        if openai_client:
+            try:
+                response = await openai_client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are the World as a Classroom Interactive AI Tutor."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
                     temperature=0.5
                 )
-            )
-            raw = response.text or ""
-            cleaned = _clean_json_text(raw)
-            data = json.loads(cleaned)
-            if "reply" in data:
-                return data
-        except Exception as e:
-            logger.error(f"Gemini tutor chat failed: {e}")
+                raw = response.choices[0].message.content or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, dict) and "reply" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"OpenAI tutor chat failed: {e}. Trying Gemini if configured.")
+
+        # 2. Try Gemini if key available
+        if client:
+            try:
+                from google.genai import types
+                response = client.models.generate_content(
+                    model=self.default_model,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.5
+                    )
+                )
+                raw = response.text or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if "reply" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"Gemini tutor chat failed: {e}")
 
         return {
             "reply": "Savolingiz uchun tashakkur! Ushbu ob'ekt bo'yicha ilmiy tamoyillar juda qiziq.",
@@ -390,10 +484,11 @@ Return a JSON object strictly matching:
         custom_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """Provides guided scientific method reasoning, hypothesis analysis, and safe household experiment design."""
+        openai_client = self._get_openai_client(custom_key)
         client = self._get_client(custom_key)
         target_lang_str = "Uzbek (O'zbek tili)" if language == "uz" else ("Russian (Русский язык)" if language == "ru" else "English")
 
-        if not client:
+        if not client and not openai_client:
             # High quality fallback scientific inquiry response
             if language == "uz":
                 return {
@@ -503,23 +598,45 @@ Return strictly a JSON object adhering to:
 }}
 Return only valid JSON.
 """
-        try:
-            from google.genai import types
-            response = client.models.generate_content(
-                model=self.default_model,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
+        # 1. Try OpenAI if key available
+        if openai_client:
+            try:
+                response = await openai_client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are the AI Chief Scientist in World as a Classroom."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
                     temperature=0.3
                 )
-            )
-            raw = response.text or ""
-            cleaned = _clean_json_text(raw)
-            data = json.loads(cleaned)
-            if "hypothesis_critique" in data:
-                return data
-        except Exception as e:
-            logger.error(f"Gemini scientific inquiry failed: {e}")
+                raw = response.choices[0].message.content or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if isinstance(data, dict) and "hypothesis_critique" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"OpenAI scientific inquiry failed: {e}. Trying Gemini if configured.")
+
+        # 2. Try Gemini if key available
+        if client:
+            try:
+                from google.genai import types
+                response = client.models.generate_content(
+                    model=self.default_model,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.3
+                    )
+                )
+                raw = response.text or ""
+                cleaned = _clean_json_text(raw)
+                data = json.loads(cleaned)
+                if "hypothesis_critique" in data:
+                    return data
+            except Exception as e:
+                logger.error(f"Gemini scientific inquiry failed: {e}")
 
         # Fallback if AI generation failed
         return {
