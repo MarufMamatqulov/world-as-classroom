@@ -23,8 +23,16 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"]
+    # Security & Wordbox Integration
+    ALLOWED_ORIGINS_RAW: str = os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://wordbox.uz,https://www.wordbox.uz,http://wordbox.uz,http://www.wordbox.uz,https://ai.wordbox.uz,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    )
+    WORDBOX_API_SECRET: str = os.getenv("WORDBOX_API_SECRET", "wordbox-classroom-secure-2026")
+
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS_RAW.split(",") if o.strip()]
 
     class Config:
         env_file = ".env"
