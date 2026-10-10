@@ -1,0 +1,16 @@
+[Unit]
+Description=World as a Classroom FastAPI Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/world-as-classroom/backend
+ExecStart=/root/world-as-classroom/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+Environment="PATH=/root/world-as-classroom/backend/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="PYTHONPATH=/root/world-as-classroom/backend"
+
+[Install]
+WantedBy=multi-user.target

@@ -58,12 +58,14 @@ app.include_router(analytics_router.router, prefix=settings.API_PREFIX)
 
 @app.get("/api/health")
 async def health_check():
+    db_url = settings.DATABASE_URL
     return {
         "status": "healthy",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "database": "postgresql" if "postgresql" in db_url else "sqlite",
-        "gemini_configured": bool(settings.GEMINI_API_KEY)
+        "gemini_configured": bool(settings.GEMINI_API_KEY),
+        "openai_configured": bool(settings.OPENAI_API_KEY)
     }
 
 @app.get("/")
