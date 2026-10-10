@@ -1,7 +1,7 @@
 <template>
   <div class="relative w-full max-w-2xl mx-auto rounded-3xl overflow-hidden glass-panel border border-slate-800 bg-slate-900/90 shadow-2xl">
     <!-- Camera Viewport / Preview Box -->
-    <div class="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-slate-950 flex items-center justify-center overflow-hidden">
+    <div class="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-slate-950 flex items-center justify-center overflow-hidden select-none">
       <!-- 1. Live Video Stream -->
       <video
         v-show="isCameraActive && !capturedPreview"
@@ -12,17 +12,68 @@
         class="w-full h-full object-cover"
       ></video>
 
-      <!-- 2. Captured Image Preview -->
-      <img
-        v-if="capturedPreview"
-        :src="capturedPreview"
-        alt="Captured preview"
-        class="w-full h-full object-cover"
-      />
+      <!-- 2. Captured Image Preview with Bounding Boxes -->
+      <div v-if="capturedPreview || explorationStore.imagePreview" class="relative w-full h-full">
+        <img
+          :src="capturedPreview || explorationStore.imagePreview || ''"
+          alt="Captured preview"
+          class="w-full h-full object-cover"
+        />
+
+        <!-- Clickable Magic Vision Bounding Boxes -->
+        <div
+          v-if="explorationStore.detectedObjects.length > 0 && !explorationStore.isAnalyzing"
+          class="absolute inset-0 pointer-events-auto"
+        >
+          <div
+            v-for="(obj, idx) in explorationStore.detectedObjects"
+            :key="idx"
+            v-show="obj.bounding_box"
+            @click.stop="selectObject(obj)"
+            class="absolute border-2 transition-all duration-200 cursor-pointer rounded-xl flex flex-col justify-between group"
+            :class="explorationStore.selectedObject?.name === obj.name
+              ? 'border-emerald-400 bg-emerald-500/25 shadow-[0_0_20px_rgba(16,185,129,0.5)] z-30 ring-2 ring-emerald-300 scale-[1.01]'
+              : 'border-cyan-400/80 bg-cyan-500/10 hover:border-cyan-300 hover:bg-cyan-500/20 z-20'"
+            :style="{
+              top: `${(obj.bounding_box?.ymin ?? 0) * 100}%`,
+              left: `${(obj.bounding_box?.xmin ?? 0) * 100}%`,
+              width: `${Math.max(0.12, ((obj.bounding_box?.xmax ?? 1) - (obj.bounding_box?.xmin ?? 0))) * 100}%`,
+              height: `${Math.max(0.12, ((obj.bounding_box?.ymax ?? 1) - (obj.bounding_box?.ymin ?? 0))) * 100}%`
+            }"
+          >
+            <!-- Label Tag -->
+            <div class="p-1 sm:p-1.5 flex items-center justify-between pointer-events-none">
+              <span
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold text-white shadow-lg bg-slate-950/90 backdrop-blur-md border"
+                :class="explorationStore.selectedObject?.name === obj.name ? 'border-emerald-400 text-emerald-300' : 'border-cyan-400 text-cyan-200'"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="explorationStore.selectedObject?.name === obj.name ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'"
+                ></span>
+                <span>{{ obj.name }}</span>
+                <span class="text-[9px] text-slate-400">{{ Math.round(obj.confidence * 100) }}%</span>
+              </span>
+            </div>
+
+            <!-- Bottom Action: Quick edit prompt -->
+            <div class="p-1 flex justify-end">
+              <button
+                @click.stop="openCorrectionModal(obj)"
+                class="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded bg-slate-900/90 hover:bg-slate-800 text-[10px] text-emerald-400 border border-emerald-500/40 flex items-center gap-1 shadow pointer-events-auto"
+                title="Nomini to'g'rilash"
+              >
+                <Edit3Icon class="w-3 h-3" />
+                <span>To'g'rilash</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- 3. Camera Idle State (when camera is not started & no image) -->
       <div
-        v-if="!isCameraActive && !capturedPreview"
+        v-if="!isCameraActive && !capturedPreview && !explorationStore.imagePreview"
         class="flex flex-col items-center justify-center p-8 text-center text-slate-400"
       >
         <div class="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 text-emerald-400 shadow-inner">
@@ -56,15 +107,15 @@
       <!-- 4. Scanning Laser Overlay Animation -->
       <div
         v-if="explorationStore.isAnalyzing"
-        class="absolute inset-0 pointer-events-none flex flex-col justify-between"
+        class="absolute inset-0 pointer-events-none flex flex-col justify-between z-40"
       >
         <div class="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10b981] animate-scan relative"></div>
-        <div class="absolute inset-0 bg-emerald-500/5 backdrop-blur-[1px] flex flex-col items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-500/10 backdrop-blur-[2px] flex flex-col items-center justify-center p-4">
           <div class="px-6 py-4 rounded-2xl glass-panel bg-slate-950/90 border border-emerald-500/40 text-center shadow-2xl flex flex-col items-center gap-3">
             <Loader2Icon class="w-8 h-8 text-emerald-400 animate-spin" />
             <div>
               <p class="font-bold text-white text-base">{{ t.scanner.analyzing }}</p>
-              <p class="text-xs text-slate-400 max-w-xs mt-1">{{ t.scanner.analyzingSubtitle }}</p>
+              <p class="text-xs text-slate-400 max-w-xs mt-1">AI ob'ektlarni aniqlamoqda va chegaralarni belgilamoqda...</p>
             </div>
           </div>
         </div>
@@ -88,13 +139,13 @@
       <!-- Flash Animation on capture -->
       <div
         v-if="showFlash"
-        class="absolute inset-0 bg-white pointer-events-none transition-opacity duration-300 opacity-80"
+        class="absolute inset-0 bg-white pointer-events-none transition-opacity duration-300 opacity-80 z-50"
       ></div>
 
       <!-- Error / Permission notification banner -->
       <div
         v-if="errorMessage"
-        class="absolute top-4 left-4 right-4 p-3 rounded-xl bg-rose-500/90 text-white text-xs font-medium flex items-center justify-between shadow-lg"
+        class="absolute top-4 left-4 right-4 p-3 rounded-xl bg-rose-500/90 text-white text-xs font-medium flex items-center justify-between shadow-lg z-50"
       >
         <span>{{ errorMessage }}</span>
         <button @click="errorMessage = ''" class="text-white hover:text-slate-200">✕</button>
@@ -103,7 +154,7 @@
 
     <!-- Active Camera Controls Toolbar -->
     <div
-      v-if="isCameraActive || capturedPreview"
+      v-if="isCameraActive || capturedPreview || explorationStore.imagePreview"
       class="p-4 sm:p-5 bg-slate-900 border-t border-slate-800 flex items-center justify-between"
     >
       <!-- Left: Switch camera or stop -->
@@ -127,7 +178,7 @@
         </button>
 
         <button
-          v-if="capturedPreview"
+          v-if="capturedPreview || explorationStore.imagePreview"
           @click="retakePhoto()"
           class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors"
         >
@@ -150,8 +201,18 @@
         </button>
       </div>
 
-      <!-- Right: Upload or Browse -->
-      <div>
+      <!-- Right: Correction Button & Upload -->
+      <div class="flex items-center gap-2">
+        <button
+          v-if="explorationStore.selectedObject"
+          @click="openCorrectionModal(explorationStore.selectedObject)"
+          class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+          title="Nomini o'zgartirish"
+        >
+          <Edit3Icon class="w-4 h-4" />
+          <span class="hidden sm:inline">To'g'rilash</span>
+        </button>
+
         <label class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors" :title="t.scanner.uploadImage">
           <UploadIcon class="w-5 h-5 text-emerald-400" />
           <input
@@ -163,6 +224,53 @@
         </label>
       </div>
     </div>
+
+    <!-- Modal: Object Recognition Correction / Rename -->
+    <div
+      v-if="isCorrectionOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+      @click.self="isCorrectionOpen = false"
+    >
+      <div class="w-full max-w-md rounded-2xl glass-panel bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h4 class="text-base font-bold text-white flex items-center gap-2">
+            <SparklesIcon class="w-4 h-4 text-emerald-400" />
+            <span>Ob'ekt Nomini To'g'rilash</span>
+          </h4>
+          <button @click="isCorrectionOpen = false" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+
+        <p class="text-xs text-slate-300">
+          Agar sun'iy intellekt ob'ektni noaniq aniqlagan bo'lsa yoki o'rganmoqchi bo'lgan maxsus qismingizni aniq ko'rsatmoqchi bo'lsangiz, to'g'ri nomini kiriting:
+        </p>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">To'g'ri ob'ekt nomi:</label>
+          <input
+            v-model="correctionInput"
+            type="text"
+            placeholder="Masalan: Optik Mikroskop, Quyosh paneli, Kvars soat"
+            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:border-emerald-500 focus:outline-none"
+            @keyup.enter="applyCorrection"
+          />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            @click="isCorrectionOpen = false"
+            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800"
+          >
+            Bekor qilish
+          </button>
+          <button
+            @click="applyCorrection"
+            class="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 transition-colors"
+          >
+            Saqlash va Yangilash
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -170,13 +278,16 @@
 import { ref, onUnmounted } from 'vue'
 import { useI18n } from '@/i18n'
 import { useExplorationStore } from '@/stores/exploration'
+import type { DetectedObject } from '@/api/client'
 import {
   Camera as CameraIcon,
   Upload as UploadIcon,
   SwitchCamera as SwitchCameraIcon,
   VideoOff as VideoOffIcon,
   RotateCcw as RotateCcwIcon,
-  Loader2 as Loader2Icon
+  Loader2 as Loader2Icon,
+  Sparkles as SparklesIcon,
+  Edit3 as Edit3Icon
 } from '@lucide/vue'
 
 const emit = defineEmits<{
@@ -193,6 +304,25 @@ const capturedPreview = ref<string | null>(null)
 const showFlash = ref(false)
 const errorMessage = ref('')
 let mediaStream: MediaStream | null = null
+
+// Correction modal state
+const isCorrectionOpen = ref(false)
+const correctionInput = ref('')
+
+const selectObject = (obj: DetectedObject) => {
+  explorationStore.selectedObject = obj
+}
+
+const openCorrectionModal = (obj: DetectedObject) => {
+  correctionInput.value = obj.name
+  isCorrectionOpen.value = true
+}
+
+const applyCorrection = async () => {
+  if (!correctionInput.value.trim()) return
+  await explorationStore.correctSelectedObject(correctionInput.value.trim(), undefined, lang.value)
+  isCorrectionOpen.value = false
+}
 
 const startCamera = async () => {
   errorMessage.value = ''

@@ -19,11 +19,29 @@
           <span>{{ t.lesson.backToScanner }}</span>
         </router-link>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Story Card Button -->
+          <button
+            @click="openStoryModal"
+            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-500 text-slate-200 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition-colors"
+          >
+            <Share2Icon class="w-4 h-4 text-emerald-400" />
+            <span>Kashfiyot Kartasi</span>
+          </button>
+
+          <!-- AI Scientist Mode Link -->
+          <router-link
+            to="/scientist"
+            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs sm:text-sm font-bold flex items-center gap-2 hover:bg-cyan-500/10 transition-colors"
+          >
+            <FlaskConicalIcon class="w-4 h-4 text-cyan-400" />
+            <span>AI Olim Rejimi</span>
+          </router-link>
+
           <!-- Tutor Toggle Button -->
           <button
             @click="showTutorDrawer = !showTutorDrawer"
-            class="px-4 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-400 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-emerald-500/10 transition-colors"
+            class="px-3.5 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-400 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-emerald-500/10 transition-colors"
           >
             <BotIcon class="w-4 h-4" />
             <span>{{ t.lesson.askTutorBtn }}</span>
@@ -159,6 +177,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Discovery Story Card Modal -->
+    <DiscoveryStoryModal
+      :isOpen="isStoryOpen"
+      :cardData="storyCardData"
+      @close="isStoryOpen = false"
+    />
   </div>
 </template>
 
@@ -167,11 +192,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '@/i18n'
 import { useExplorationStore } from '@/stores/exploration'
-import { api, type LessonDetail, type QuizDetail } from '@/api/client'
+import { api, type LessonDetail, type QuizDetail, type DiscoveryStoryCardResponse } from '@/api/client'
 import SubjectTabs from '@/components/SubjectTabs.vue'
 import ExperimentCard from '@/components/ExperimentCard.vue'
 import InteractiveQuiz from '@/components/InteractiveQuiz.vue'
 import AITutorChat from '@/components/AITutorChat.vue'
+import DiscoveryStoryModal from '@/components/DiscoveryStoryModal.vue'
 import {
   ArrowLeft as ArrowLeftIcon,
   Atom as AtomIcon,
@@ -179,7 +205,9 @@ import {
   HelpCircle as HelpCircleIcon,
   Sparkles as SparklesIcon,
   BookOpen as BookOpenIcon,
-  Loader2 as Loader2Icon
+  Loader2 as Loader2Icon,
+  Share2 as Share2Icon,
+  FlaskConical as FlaskConicalIcon
 } from '@lucide/vue'
 
 const { t } = useI18n()
@@ -191,6 +219,19 @@ const isLoading = ref(true)
 const lesson = ref<LessonDetail | null>(null)
 const quizData = ref<QuizDetail | null>(null)
 const showTutorDrawer = ref(false)
+const isStoryOpen = ref(false)
+const storyCardData = ref<DiscoveryStoryCardResponse | null>(null)
+
+const openStoryModal = async () => {
+  if (!lesson.value) return
+  try {
+    const card = await api.getDiscoveryStoryCard(lesson.value.id)
+    storyCardData.value = card
+    isStoryOpen.value = true
+  } catch (err) {
+    console.error('Failed to load story card:', err)
+  }
+}
 
 const lessonImage = computed(() => {
   return explorationStore.imagePreview || null

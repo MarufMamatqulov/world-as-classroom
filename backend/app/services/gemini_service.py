@@ -379,4 +379,165 @@ Return a JSON object strictly matching:
             "suggested_prompts": ["Keyingi bosqichni ko'rsating", "Test savollariga o'tish"]
         }
 
+    async def conduct_scientific_inquiry(
+        self,
+        object_name: str,
+        domain: str,
+        observation: str,
+        hypothesis: str,
+        language: str = "uz",
+        difficulty_level: str = "intermediate",
+        custom_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Provides guided scientific method reasoning, hypothesis analysis, and safe household experiment design."""
+        client = self._get_client(custom_key)
+        target_lang_str = "Uzbek (O'zbek tili)" if language == "uz" else ("Russian (Русский язык)" if language == "ru" else "English")
+
+        if not client:
+            # High quality fallback scientific inquiry response
+            if language == "uz":
+                return {
+                    "object_name": object_name,
+                    "domain": domain,
+                    "hypothesis_critique": f"Sizning '{hypothesis}' gipotezangiz ilmiy jihatdan juda qiziq va tajribada tekshirish mumkin bo'lgan aniq bog'liqlikni ifodalaydi. Ilmiy metodning eng muhim qoidasi — gipotezani o'lchash yoki solishtirish orqali isbotlashdir.",
+                    "is_valid_hypothesis": True,
+                    "experiment_plan": {
+                        "title": f"'{object_name}' bo'yicha Xavfsiz Uy Laboratoriyasi Sinovi",
+                        "materials": [
+                            "O'rganilayotgan ob'ekt yoki uning modeli",
+                            "Oddiy o'lchov asbobi (chizg'ich yoki telefon taymeri)",
+                            "Kuzatuv daftari va qalam"
+                        ],
+                        "steps": [
+                            f"1. Dastlabki holatni aniqlang: ob'ektning tinch yoki me'yoriy holatidagi parametrlarini yozib oling.",
+                            f"2. Bir parametrni o'zgartiring va ikkinchi parametr qanday javob qaytarishini sinab ko'ring.",
+                            f"3. Natijani 3 marta takrorlang (o'lchov aniqligi uchun o'rtacha qiymatni oling).",
+                            f"4. Olingan natijalarni dastlabki gipotezangiz bilan taqqoslang."
+                        ],
+                        "safety_guidelines": "Tajriba mutlaqo xavfsiz. O'tkir jism, olov yoki xavfli moddalardan foydalanilmaydi. Xonani yorug' joyda o'tkazing.",
+                        "expected_observation": f"Gipotezangiz to'g'ri bo'lsa, o'zgaruvchi oshganda kutilgan fizik jarayon kuchayishi yoki aniq qonuniyat bo'yicha o'zgarishi qayd etiladi."
+                    },
+                    "scientific_principles": [
+                        "Sabab-oqibat bog'liqligi (Causality)",
+                        "Nazorat qilinuvchi tajriba (Controlled Experimentation)",
+                        "O'lchov xatoligi va takroriylik (Reproducibility)"
+                    ],
+                    "ai_guidance": "Siz haqiqiy yosh olim kabi fikrlayapsiz! Kuzatish va gipoteza tuzish zamonaviy ilm-fanning yuragidir.",
+                    "xp_awarded": 50
+                }
+            elif language == "ru":
+                return {
+                    "object_name": object_name,
+                    "domain": domain,
+                    "hypothesis_critique": f"Ваша гипотеза '{hypothesis}' логически обоснована и формулирует проверяемую связь. Это отличный пример научного мышления.",
+                    "is_valid_hypothesis": True,
+                    "experiment_plan": {
+                        "title": f"Безопасный домашний эксперимент с '{object_name}'",
+                        "materials": ["Объект исследования", "Линейка или секундомер", "Блокнот для записей"],
+                        "steps": [
+                            "1. Зафиксируйте исходное состояние объекта.",
+                            "2. Измените один фактор и наблюдайте реакцию системы.",
+                            "3. Повторите замер 3 раза для статистической точности.",
+                            "4. Сравните выводы с вашей гипотезой."
+                        ],
+                        "safety_guidelines": "Опыт безопасен, используются только бытовые предметы без огня и химикатов.",
+                        "expected_observation": "Подтверждение математической или физической пропорциональности."
+                    },
+                    "scientific_principles": ["Принцип фальсифицируемости", "Воспроизводимость результатов"],
+                    "ai_guidance": "Прекрасный научный подход! Продолжайте проверять гипотезы.",
+                    "xp_awarded": 50
+                }
+            else:
+                return {
+                    "object_name": object_name,
+                    "domain": domain,
+                    "hypothesis_critique": f"Your hypothesis '{hypothesis}' is well-formulated and directly testable. Good science starts with asking questions that can be verified through observation.",
+                    "is_valid_hypothesis": True,
+                    "experiment_plan": {
+                        "title": f"Safe Home Laboratory Inquiry: {object_name}",
+                        "materials": ["The target object or model", "Ruler or smartphone stopwatch", "Observation notebook"],
+                        "steps": [
+                            "1. Record baseline conditions and observable state.",
+                            "2. Modify one independent variable while keeping others constant.",
+                            "3. Repeat 3 trials to compute average values.",
+                            "4. Evaluate if outcome supports your initial hypothesis."
+                        ],
+                        "safety_guidelines": "100% child-safe. No hazardous chemicals, flames, or sharp tools required.",
+                        "expected_observation": "Consistent physical response aligning with the test variable."
+                    },
+                    "scientific_principles": ["Hypothesis-Driven Inquiry", "Controlled Variables", "Empirical Verification"],
+                    "ai_guidance": "Outstanding scientific reasoning! You are practicing genuine empirical methodology.",
+                    "xp_awarded": 50
+                }
+
+        prompt = f"""
+You are the AI Chief Scientist in 'World as a Classroom'.
+Guide a student through the rigorous Scientific Method for: "{object_name}" ({domain}).
+
+Student's Observation:
+"{observation}"
+
+Student's Proposed Hypothesis:
+"{hypothesis}"
+
+Student profile: Complexity level {difficulty_level}, Language: {target_lang_str}.
+
+Analyze the hypothesis, provide constructive educational feedback, design a SAFE, child-friendly experiment (strictly household items, non-toxic, safe for school children), and identify core scientific principles.
+
+Return strictly a JSON object adhering to:
+{{
+  "object_name": "{object_name}",
+  "domain": "{domain}",
+  "hypothesis_critique": "Insightful scientific feedback in {target_lang_str} assessing clarity, testability, and validity",
+  "is_valid_hypothesis": true,
+  "experiment_plan": {{
+    "title": "Safe DIY Experiment Title in {target_lang_str}",
+    "materials": ["Item 1", "Item 2", "Item 3"],
+    "steps": ["Step 1", "Step 2", "Step 3", "Step 4"],
+    "safety_guidelines": "Safety notes emphasizing non-hazardous child-safe steps in {target_lang_str}",
+    "expected_observation": "What the student should observe in {target_lang_str}"
+  }},
+  "scientific_principles": ["Principle 1", "Principle 2", "Principle 3"],
+  "ai_guidance": "Encouraging mentor conclusion in {target_lang_str}",
+  "xp_awarded": 50
+}}
+Return only valid JSON.
+"""
+        try:
+            from google.genai import types
+            response = client.models.generate_content(
+                model=self.default_model,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.3
+                )
+            )
+            raw = response.text or ""
+            cleaned = _clean_json_text(raw)
+            data = json.loads(cleaned)
+            if "hypothesis_critique" in data:
+                return data
+        except Exception as e:
+            logger.error(f"Gemini scientific inquiry failed: {e}")
+
+        # Fallback if AI generation failed
+        return {
+            "object_name": object_name,
+            "domain": domain,
+            "hypothesis_critique": f"Gipotezangiz '{hypothesis}' ilmiy qiziqish uyg'otadi.",
+            "is_valid_hypothesis": True,
+            "experiment_plan": {
+                "title": f"'{object_name}' bo'yicha Xavfsiz Tadqiqot",
+                "materials": ["Ob'ekt", "Daftar"],
+                "steps": ["1. O'lchang", "2. Qayd qiling"],
+                "safety_guidelines": "Xavfsizlik qoidalariga rioya qiling.",
+                "expected_observation": "O'zgarishlar qayd etiladi."
+            },
+            "scientific_principles": ["Ilmiy uslub", "Kuzatuv"],
+            "ai_guidance": "Ajoyib boshlanish!",
+            "xp_awarded": 50
+        }
+
 gemini_service = GeminiService()
+

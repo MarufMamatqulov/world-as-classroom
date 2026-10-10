@@ -20,32 +20,50 @@
         </router-link>
 
         <!-- Desktop Navigation Links -->
-        <nav class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-slate-800/60">
+        <nav class="hidden lg:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-slate-800/60">
           <router-link
             to="/scanner"
-            class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200"
-            :class="$route.path === '/scanner' ? 'bg-emerald-500 text-slate-950 font-semibold shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+            :class="$route.path === '/scanner' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
           >
-            <CameraIcon class="w-4 h-4" />
-            <span>{{ t.nav.scanner }}</span>
+            <CameraIcon class="w-3.5 h-3.5" />
+            <span>Explore</span>
           </router-link>
 
           <router-link
-            to="/dashboard"
-            class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200"
-            :class="$route.path === '/dashboard' ? 'bg-emerald-500 text-slate-950 font-semibold shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
+            to="/quests"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+            :class="$route.path === '/quests' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
           >
-            <LayoutDashboardIcon class="w-4 h-4" />
-            <span>{{ t.nav.dashboard }}</span>
+            <CompassIcon class="w-3.5 h-3.5" />
+            <span>Quests</span>
           </router-link>
 
           <router-link
-            to="/settings"
-            class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200"
-            :class="$route.path === '/settings' ? 'bg-emerald-500 text-slate-950 font-semibold shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
+            to="/scientist"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+            :class="$route.path === '/scientist' ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
           >
-            <SettingsIcon class="w-4 h-4" />
-            <span>{{ t.nav.settings }}</span>
+            <FlaskConicalIcon class="w-3.5 h-3.5" />
+            <span>AI Scientist</span>
+          </router-link>
+
+          <router-link
+            to="/passport"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+            :class="$route.path === '/passport' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
+          >
+            <GlobeIcon class="w-3.5 h-3.5" />
+            <span>My World</span>
+          </router-link>
+
+          <router-link
+            to="/analytics"
+            class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+            :class="$route.path === '/analytics' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/25' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'"
+          >
+            <ActivityIcon class="w-3.5 h-3.5" />
+            <span>Analytics</span>
           </router-link>
         </nav>
 
@@ -127,33 +145,51 @@
       </div>
     </div>
 
-    <!-- Mobile Bottom Navigation Bar -->
-    <div class="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-panel bg-slate-950/95 border-t border-slate-800/80 px-6 py-2 flex items-center justify-around">
+    <!-- Mobile Bottom Navigation Bar (5 Items: Explore, Quests, AI Scientist, My World, Profile) -->
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-panel bg-slate-950/95 border-t border-slate-800/80 px-4 py-2 flex items-center justify-around">
       <router-link
         to="/scanner"
-        class="flex flex-col items-center gap-1 text-[11px] font-medium"
-        :class="$route.path === '/scanner' ? 'text-emerald-400' : 'text-slate-400'"
+        class="flex flex-col items-center gap-1 text-[10px] font-medium transition-colors"
+        :class="$route.path === '/scanner' ? 'text-emerald-400 font-bold' : 'text-slate-400'"
       >
         <CameraIcon class="w-5 h-5" />
-        <span>{{ t.nav.scanner }}</span>
+        <span>Explore</span>
       </router-link>
 
       <router-link
-        to="/dashboard"
-        class="flex flex-col items-center gap-1 text-[11px] font-medium"
-        :class="$route.path === '/dashboard' ? 'text-emerald-400' : 'text-slate-400'"
+        to="/quests"
+        class="flex flex-col items-center gap-1 text-[10px] font-medium transition-colors"
+        :class="$route.path === '/quests' ? 'text-emerald-400 font-bold' : 'text-slate-400'"
       >
-        <LayoutDashboardIcon class="w-5 h-5" />
-        <span>{{ t.nav.dashboard }}</span>
+        <CompassIcon class="w-5 h-5" />
+        <span>Quests</span>
+      </router-link>
+
+      <router-link
+        to="/scientist"
+        class="flex flex-col items-center gap-1 text-[10px] font-medium transition-colors"
+        :class="$route.path === '/scientist' ? 'text-cyan-400 font-bold' : 'text-slate-400'"
+      >
+        <FlaskConicalIcon class="w-5 h-5" />
+        <span>AI Scientist</span>
+      </router-link>
+
+      <router-link
+        to="/passport"
+        class="flex flex-col items-center gap-1 text-[10px] font-medium transition-colors"
+        :class="$route.path === '/passport' ? 'text-indigo-400 font-bold' : 'text-slate-400'"
+      >
+        <GlobeIcon class="w-5 h-5" />
+        <span>My World</span>
       </router-link>
 
       <router-link
         to="/settings"
-        class="flex flex-col items-center gap-1 text-[11px] font-medium"
-        :class="$route.path === '/settings' ? 'text-emerald-400' : 'text-slate-400'"
+        class="flex flex-col items-center gap-1 text-[10px] font-medium transition-colors"
+        :class="$route.path === '/settings' ? 'text-emerald-400 font-bold' : 'text-slate-400'"
       >
         <SettingsIcon class="w-5 h-5" />
-        <span>{{ t.nav.settings }}</span>
+        <span>Profile</span>
       </router-link>
     </div>
   </header>
@@ -166,9 +202,11 @@ import { useAuthStore } from '@/stores/auth'
 import {
   Sparkles as SparklesIcon,
   Camera as CameraIcon,
-  LayoutDashboard as LayoutDashboardIcon,
-  Settings as SettingsIcon,
+  Compass as CompassIcon,
+  FlaskConical as FlaskConicalIcon,
   Globe as GlobeIcon,
+  Activity as ActivityIcon,
+  Settings as SettingsIcon,
   ChevronDown as ChevronDownIcon,
   Check as CheckIcon,
   LogOut as LogOutIcon

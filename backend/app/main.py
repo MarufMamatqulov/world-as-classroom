@@ -11,7 +11,11 @@ from app.routers import (
     lesson_router,
     quiz_router,
     tutor_router,
-    dashboard_router
+    dashboard_router,
+    quest_router,
+    scientist_router,
+    passport_router,
+    analytics_router
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +51,10 @@ app.include_router(lesson_router.router, prefix=settings.API_PREFIX)
 app.include_router(quiz_router.router, prefix=settings.API_PREFIX)
 app.include_router(tutor_router.router, prefix=settings.API_PREFIX)
 app.include_router(dashboard_router.router, prefix=settings.API_PREFIX)
+app.include_router(quest_router.router, prefix=settings.API_PREFIX)
+app.include_router(scientist_router.router, prefix=settings.API_PREFIX)
+app.include_router(passport_router.router, prefix=settings.API_PREFIX)
+app.include_router(analytics_router.router, prefix=settings.API_PREFIX)
 
 @app.get("/api/health")
 async def health_check():

@@ -3,11 +3,27 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from typing import Optional, List
 from app.dependencies import get_current_user_optional
 from app.models import User
-from app.schemas import ScanResponse, DetectedObject
+from app.schemas import ScanResponse, DetectedObject, BoundingBox, ObjectCorrectionRequest, ObjectCorrectionResponse
 from app.services.gemini_service import gemini_service
 from app.services.mock_curriculum import get_fallback_detected_objects
 
 router = APIRouter(prefix="/scan", tags=["Camera Scanner"])
+
+def _clamp_box(raw_box: Optional[dict]) -> Optional[BoundingBox]:
+    if not raw_box or not isinstance(raw_box, dict):
+        return None
+    try:
+        ymin = max(0.0, min(1.0, float(raw_box.get("ymin", 0.0))))
+        xmin = max(0.0, min(1.0, float(raw_box.get("xmin", 0.0))))
+        ymax = max(0.0, min(1.0, float(raw_box.get("ymax", 1.0))))
+        xmax = max(0.0, min(1.0, float(raw_box.get("xmax", 1.0))))
+        if ymax <= ymin:
+            ymax = min(1.0, ymin + 0.2)
+        if xmax <= xmin:
+            xmax = min(1.0, xmin + 0.2)
+        return BoundingBox(ymin=ymin, xmin=xmin, ymax=ymax, xmax=xmax)
+    except Exception:
+        return BoundingBox(ymin=0.1, xmin=0.1, ymax=0.9, xmax=0.9)
 
 @router.post("/upload", response_model=ScanResponse)
 async def scan_image(
@@ -54,6 +70,7 @@ async def scan_image(
 
     detected_objects: List[DetectedObject] = []
     for item in raw_objects:
+        bbox = _clamp_box(item.get("bounding_box"))
         detected_objects.append(DetectedObject(
             name=item.get("name", "Object"),
             name_en=item.get("name_en", "Object"),
@@ -61,13 +78,42 @@ async def scan_image(
             educational_hook=item.get("educational_hook", "A fascinating object for scientific exploration."),
             subjects=item.get("subjects", ["Physics", "Mathematics"]),
             confidence=float(item.get("confidence", 0.95)),
-            bounding_box=item.get("bounding_box")
+            bounding_box=bbox
         ))
 
     return ScanResponse(
         detected_objects=detected_objects,
         image_preview=image_preview,
         source="upload" if file else "camera"
+    )
+
+@router.post("/correct", response_model=ObjectCorrectionResponse)
+async def correct_detected_object(
+    req: ObjectCorrectionRequest,
+    user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Allows user to correct inaccurate AI object recognition or provide a more specific name."""
+    corrected_name = req.corrected_name.strip()
+    if not corrected_name:
+        raise HTTPException(status_code=400, detail="Corrected object name cannot be empty.")
+
+    category = req.category or "General Science"
+    subjects = ["Physics", "Technology", "Mathematics"]
+    hook = f"{corrected_name} ob'ekti bo'yicha maxsus ilmiy dars va amaliy tajribalar tayyorlandi." if req.language == "uz" else f"Interactive scientific lesson and hands-on experiments for {corrected_name}."
+
+    corrected_obj = DetectedObject(
+        name=corrected_name,
+        name_en=corrected_name,
+        category=category,
+        educational_hook=hook,
+        subjects=subjects,
+        confidence=1.0,
+        bounding_box=BoundingBox(ymin=0.1, xmin=0.1, ymax=0.9, xmax=0.9)
+    )
+
+    return ObjectCorrectionResponse(
+        success=True,
+        corrected_object=corrected_obj
     )
 
 @router.get("/samples")

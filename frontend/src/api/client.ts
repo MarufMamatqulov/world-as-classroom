@@ -7,6 +7,8 @@ export interface UserProfile {
   knowledge_level: string
   preferred_language: string
   has_custom_api_key: boolean
+  xp?: number
+  streak_days?: number
   created_at: string
 }
 
@@ -136,7 +138,7 @@ export interface ExplorationSummary {
   language: string
   image_thumbnail?: string
   created_at: string
-  quiz_completed: boolean
+  quiz_completed?: boolean
   best_score?: number
   total_questions?: number
 }
@@ -162,9 +164,143 @@ export interface DashboardStats {
   total_quizzes_completed: number
   average_quiz_score: number
   current_streak_days: number
+  total_xp?: number
   subject_mastery: SubjectMastery[]
   recent_explorations: ExplorationSummary[]
   achievements: Achievement[]
+}
+
+// --- Real World Quests ---
+export interface QuestResponse {
+  id: number
+  title: string
+  title_en?: string
+  description: string
+  domain: string
+  target_keyword: string
+  xp_reward: number
+  badge_icon: string
+  badge_title: string
+  validation_question: string
+  validation_options: string[]
+  is_daily: boolean
+  status: 'active' | 'completed'
+  completed_at?: string
+}
+
+export interface QuestSubmitResponse {
+  quest_id: number
+  success: boolean
+  message: string
+  xp_awarded: number
+  badge_awarded?: string
+  explanation?: string
+}
+
+export interface UserBadgeResponse {
+  id: string
+  title: string
+  icon: string
+  domain: string
+  unlocked_at: string
+  xp: number
+}
+
+// --- AI Scientist Mode ---
+export interface ExperimentPlanItem {
+  title: string
+  materials: string[]
+  steps: string[]
+  safety_guidelines: string
+  expected_observation: string
+}
+
+export interface ScientistInquiryResponse {
+  object_name: string
+  domain: string
+  hypothesis_critique: string
+  is_valid_hypothesis: boolean
+  experiment_plan: ExperimentPlanItem
+  scientific_principles: string[]
+  ai_guidance: string
+  xp_awarded: number
+}
+
+// --- Discovery Stories ---
+export interface DiscoveryStoryCardResponse {
+  exploration_id: number
+  object_name: string
+  object_name_en?: string
+  category: string
+  primary_subject: string
+  key_formula?: string
+  core_discovery: string
+  explorer_callsign: string
+  xp_earned: number
+  discovery_date: string
+  image_thumbnail?: string
+  verified_badge: string
+  share_url: string
+}
+
+// --- Knowledge Passport ---
+export interface RealmStamp {
+  id: string
+  name: string
+  domain: string
+  icon: string
+  color: string
+  unlocked: boolean
+  discoveries_count: number
+  mastery_level: 'Novice' | 'Adept' | 'Master'
+}
+
+export interface PassportLevelInfo {
+  current_level: number
+  rank_title: string
+  current_xp: number
+  next_level_xp: number
+  progress_percentage: number
+}
+
+export interface KnowledgePassportResponse {
+  explorer_callsign: string
+  member_since: string
+  level_info: PassportLevelInfo
+  total_discoveries: number
+  streak_days: number
+  stamps: RealmStamp[]
+  recent_chronicle: ExplorationSummary[]
+}
+
+// --- Learning Analytics & System Monitoring ---
+export interface AIRequestMetric {
+  endpoint: string
+  model_name: string
+  prompt_tokens: number
+  completion_tokens: number
+  estimated_cost_usd: number
+  latency_ms: number
+  cache_hit: boolean
+  created_at: string
+}
+
+export interface SystemCostAnalytics {
+  total_api_calls: number
+  total_prompt_tokens: number
+  total_completion_tokens: number
+  total_tokens: number
+  total_cost_usd: number
+  cache_hits: number
+  cache_hit_rate_pct: number
+  avg_latency_ms: number
+  recent_logs: AIRequestMetric[]
+}
+
+export interface AnalyticsOverview {
+  student_stats: DashboardStats
+  passport: KnowledgePassportResponse
+  system_monitoring?: SystemCostAnalytics
 }
 
 const API_BASE = '/api'
@@ -178,10 +314,10 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let errorDetail = 'Network request failed'
     try {
-      const errJson = await res.json()
-      errorDetail = errJson.detail || errorDetail
+      const data = await res.json()
+      errorDetail = data.detail || data.message || errorDetail
     } catch {
-      // ignore
+      // keep fallback
     }
     throw new Error(errorDetail)
   }
@@ -190,7 +326,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   // Auth
-  async register(data: { email: string; password: string; full_name: string; age?: number; grade?: string; knowledge_level?: string; preferred_language?: string }) {
+  async register(data: any) {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -199,7 +335,7 @@ export const api = {
     return handleResponse<{ access_token: string; user: UserProfile }>(res)
   },
 
-  async login(data: { email: string; password: string }) {
+  async login(data: any) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -215,7 +351,7 @@ export const api = {
     return handleResponse<UserProfile>(res)
   },
 
-  async updateProfile(data: Partial<UserProfile> & { custom_api_key?: string }) {
+  async updateProfile(data: any) {
     const res = await fetch(`${API_BASE}/auth/profile`, {
       method: 'PUT',
       headers: {
@@ -227,7 +363,7 @@ export const api = {
     return handleResponse<UserProfile>(res)
   },
 
-  // Scan
+  // Scanner
   async scanFile(file: File, language: string) {
     const formData = new FormData()
     formData.append('file', file)
@@ -254,6 +390,18 @@ export const api = {
     return handleResponse<ScanResponse>(res)
   },
 
+  async correctDetectedObject(original_name: string, corrected_name: string, category?: string, language: string = 'uz') {
+    const res = await fetch(`${API_BASE}/scan/correct`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({ original_name, corrected_name, category, language }),
+    })
+    return handleResponse<{ success: boolean; corrected_object: DetectedObject }>(res)
+  },
+
   async getSamples(language: string) {
     const res = await fetch(`${API_BASE}/scan/samples?language=${encodeURIComponent(language)}`)
     return handleResponse<any[]>(res)
@@ -268,6 +416,8 @@ export const api = {
     age?: number
     grade?: string
     knowledge_level?: string
+    primary_focus_subject?: string
+    difficulty_level?: string
     image_thumbnail?: string
   }) {
     const res = await fetch(`${API_BASE}/lessons/generate`, {
@@ -295,6 +445,13 @@ export const api = {
     return handleResponse<LessonDetail>(res)
   },
 
+  async getDiscoveryStoryCard(lessonId: number) {
+    const res = await fetch(`${API_BASE}/lessons/${lessonId}/story-card`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<DiscoveryStoryCardResponse>(res)
+  },
+
   // Quizzes
   async getQuizByLesson(lessonId: number) {
     const res = await fetch(`${API_BASE}/quizzes/by-lesson/${lessonId}`, {
@@ -313,6 +470,87 @@ export const api = {
       body: JSON.stringify({ quiz_id: quizId, answers }),
     })
     return handleResponse<QuizSubmitResponse>(res)
+  },
+
+  // Real World Quests
+  async getDailyQuests() {
+    const res = await fetch(`${API_BASE}/quests/daily`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<QuestResponse[]>(res)
+  },
+
+  async submitQuest(questId: number, selectedOptionIndex: number, explorationId?: number) {
+    const res = await fetch(`${API_BASE}/quests/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({
+        quest_id: questId,
+        selected_option_index: selectedOptionIndex,
+        exploration_id: explorationId,
+      }),
+    })
+    return handleResponse<QuestSubmitResponse>(res)
+  },
+
+  async getUserBadges() {
+    const res = await fetch(`${API_BASE}/quests/badges`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<UserBadgeResponse[]>(res)
+  },
+
+  // AI Scientist Mode
+  async conductScientificInquiry(data: {
+    object_name: string
+    domain?: string
+    observation: string
+    hypothesis: string
+    language?: string
+    difficulty_level?: string
+  }) {
+    const res = await fetch(`${API_BASE}/scientist/inquiry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify(data),
+    })
+    return handleResponse<ScientistInquiryResponse>(res)
+  },
+
+  async getScientistHistory() {
+    const res = await fetch(`${API_BASE}/scientist/history`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<any[]>(res)
+  },
+
+  // Knowledge Passport
+  async getMyPassport() {
+    const res = await fetch(`${API_BASE}/passport/me`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<KnowledgePassportResponse>(res)
+  },
+
+  // Learning Analytics & Monitoring
+  async getSystemAnalytics() {
+    const res = await fetch(`${API_BASE}/analytics/system`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<SystemCostAnalytics>(res)
+  },
+
+  async getAnalyticsOverview() {
+    const res = await fetch(`${API_BASE}/analytics/overview`, {
+      headers: { ...getAuthHeader() },
+    })
+    return handleResponse<AnalyticsOverview>(res)
   },
 
   // Tutor

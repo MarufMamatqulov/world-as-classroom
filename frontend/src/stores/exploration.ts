@@ -15,6 +15,8 @@ export const useExplorationStore = defineStore('exploration', () => {
   const selectedObject = ref<DetectedObject | null>(null)
   const currentLesson = ref<LessonDetail | null>(null)
   const activeSubject = ref<string>('Physics')
+  const selectedSubject = ref<string>('Physics')
+  const selectedDifficulty = ref<string>('intermediate')
 
   const scanFile = async (file: File, lang: string) => {
     isAnalyzing.value = true
@@ -46,6 +48,29 @@ export const useExplorationStore = defineStore('exploration', () => {
     }
   }
 
+  const correctSelectedObject = async (correctedName: string, category?: string, lang: string = 'uz') => {
+    if (!selectedObject.value) return null
+    try {
+      const res = await api.correctDetectedObject(selectedObject.value.name, correctedName, category, lang)
+      if (res.success && res.corrected_object) {
+        const idx = detectedObjects.value.findIndex(o => o.name === selectedObject.value?.name)
+        if (idx >= 0) {
+          detectedObjects.value[idx] = res.corrected_object
+        }
+        selectedObject.value = res.corrected_object
+        return res.corrected_object
+      }
+    } catch (e) {
+      // Direct local update if network issue
+      selectedObject.value = {
+        ...selectedObject.value,
+        name: correctedName,
+        name_en: correctedName,
+      }
+    }
+    return selectedObject.value
+  }
+
   const setManualSample = (sample: any) => {
     selectedObject.value = {
       name: sample.name,
@@ -70,7 +95,9 @@ export const useExplorationStore = defineStore('exploration', () => {
         language: lang,
         age: userProfile?.age,
         grade: userProfile?.grade,
-        knowledge_level: userProfile?.knowledge_level,
+        knowledge_level: selectedDifficulty.value || userProfile?.knowledge_level,
+        primary_focus_subject: selectedSubject.value,
+        difficulty_level: selectedDifficulty.value,
         image_thumbnail: imagePreview.value || undefined
       })
       currentLesson.value = lesson
@@ -125,8 +152,11 @@ export const useExplorationStore = defineStore('exploration', () => {
     selectedObject,
     currentLesson,
     activeSubject,
+    selectedSubject,
+    selectedDifficulty,
     scanFile,
     scanBase64,
+    correctSelectedObject,
     setManualSample,
     generateLessonForSelected,
     fetchLesson,

@@ -76,7 +76,6 @@ async def submit_quiz(
 
     percentage = round((score / total_questions) * 100, 1)
 
-    # Save attempt
     attempt = QuizAttempt(
         user_id=user.id if user else None,
         quiz_id=quiz.id,
@@ -85,6 +84,15 @@ async def submit_quiz(
         answers_json=json.dumps(req.answers)
     )
     db.add(attempt)
+
+    # Award Quiz XP (25 XP per correct answer + 20 bonus for perfect score)
+    earned_xp = score * 25 + (20 if score == total_questions else 0)
+    if user:
+        user_obj = await db.get(User, user.id)
+        if user_obj:
+            user_obj.xp = (user_obj.xp or 0) + earned_xp
+            db.add(user_obj)
+
     await db.commit()
     await db.refresh(attempt)
 
