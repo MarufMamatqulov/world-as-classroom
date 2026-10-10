@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Security & Wordbox Integration
     ALLOWED_ORIGINS_RAW: str = os.getenv(
         "ALLOWED_ORIGINS",
-        "https://wordbox.uz,https://www.wordbox.uz,http://wordbox.uz,http://www.wordbox.uz,https://ai.wordbox.uz,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+        "https://wordbox.uz,https://www.wordbox.uz,http://wordbox.uz,http://www.wordbox.uz,https://ai.wordbox.uz,https://aimarafon.uz,https://api.aimarafon.uz,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     )
     WORDBOX_API_SECRET: str = os.getenv("WORDBOX_API_SECRET", "wordbox-classroom-secure-2026")
 

@@ -43,11 +43,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware restricted to wordbox.uz domains and development
+# CORS Middleware restricted to wordbox.uz and aimarafon.uz domains and development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https?://(.*\.)?wordbox\.uz(:\d+)?$",
+    allow_origin_regex=r"^https?://(.*\.)?(wordbox\.uz|aimarafon\.uz)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
@@ -91,6 +91,8 @@ async def security_and_rate_limit_middleware(request: Request, call_next):
         is_wordbox_origin = (
             "wordbox.uz" in origin or
             "wordbox.uz" in referer or
+            "aimarafon.uz" in origin or
+            "aimarafon.uz" in referer or
             "localhost" in origin or
             "127.0.0.1" in origin
         )
